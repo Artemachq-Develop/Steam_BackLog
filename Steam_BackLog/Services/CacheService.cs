@@ -4,8 +4,6 @@ namespace Steam_BackLog.Services;
 
 public class CacheService
 {
-    // Имя файла вынесено как поле класса, можно передавать его через конструктор, 
-    // если в будущем захотите иметь несколько кэшей (например, для разных пользователей)
     private readonly string _cacheFileName;
 
     public CacheService(string cacheFileName = "cache.json")
@@ -30,7 +28,6 @@ public class CacheService
 
     /// <summary>
     /// Сериализует список игр и сохраняет его в JSON файл.
-    /// Использует WriteIndented = true для красивого форматирования (человекочитаемого).
     /// </summary>
     public void SaveCache(List<Models.GameData> data)
     {

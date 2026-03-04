@@ -9,7 +9,7 @@ public class Models
         public string SteamApiKey { get; set; } = "";
         public string SteamId { get; set; } = "";
     }
-
+    
     public class GameData
     {
         public int AppId { get; set; }
@@ -17,12 +17,10 @@ public class Models
         public int PlaytimeForever { get; set; }
         public int MetacriticScore { get; set; }
         public double TimeToBeatHours { get; set; }
-
-        // Формула ценности: Оценка / Корень из времени прохождения
         public double ValueScore => TimeToBeatHours > 0 ? MetacriticScore / Math.Sqrt(TimeToBeatHours) : 0;
     }
 
-    // Классы для десериализации ответов Steam API
+    /* Классы для десериализации ответов Steam API */
     public class SteamOwnedGamesResponse
     {
         [JsonPropertyName("response")]

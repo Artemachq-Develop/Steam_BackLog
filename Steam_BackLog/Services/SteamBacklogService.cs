@@ -6,7 +6,7 @@ namespace Steam_BackLog.Services;
 public class SteamBacklogService
 {
     private readonly Models.Config _config;
-    private readonly CacheService _cacheService; // Предполагаем, что кэш тоже можно вынести в отдельный класс
+    private readonly CacheService _cacheService;
     private static readonly HttpClient httpClient = new HttpClient();
 
     public SteamBacklogService(Models.Config config)
@@ -15,10 +15,9 @@ public class SteamBacklogService
         _cacheService = new CacheService();
     }
 
-    // Action-делегат позволяет сервису отправлять обновления прогресса "наверх" в Program.cs
     public async Task ProcessAccountAsync(string steamId, int? limit, Action<string, int, int> onProgressUpdated)
     {
-        // 1. Получаем игры из Steam
+        /* 1. Получаем игры из Steam */
         var games = await GetOwnedGamesAsync(_config.SteamApiKey, steamId);
         if (games == null || !games.Any())
         {
@@ -30,7 +29,7 @@ public class SteamBacklogService
             ? fullBacklog.Take(limit.Value).ToList()
             : fullBacklog;
 
-        // 2. Инициализируем компоненты
+        /* 2. Инициализируем компоненты */
         var cachedData = _cacheService.LoadCache();
         using var hltbScraper = new HltbScraper();
         var semaphore = new SemaphoreSlim(4);
@@ -43,7 +42,7 @@ public class SteamBacklogService
 
         onProgressUpdated?.Invoke("Начинаем сбор данных...", processedCount, totalCount);
 
-        // 3. Многопоточный (лимитированный) сбор данных
+        /* 3. Многопоточный (лимитированный) сбор данных */
         foreach (var game in backlogToProcess)
         {
             tasks.Add(Task.Run(async () =>
@@ -80,7 +79,7 @@ public class SteamBacklogService
                         }
                     }
 
-                    // Обновляем счетчик и отправляем событие в UI
+                    /* Обновляем счетчик и отправляем событие в UI */
                     lock (lockObj)
                     {
                         processedCount++;
@@ -102,7 +101,7 @@ public class SteamBacklogService
         }
 
         await Task.WhenAll(tasks);
-        _cacheService.SaveCache(processedGames); // Финальное сохранение
+        _cacheService.SaveCache(processedGames);
     }
 
     private async Task<double> FetchHltbTimeAsync(HltbScraper scraper, string? gameName,

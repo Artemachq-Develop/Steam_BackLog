@@ -6,13 +6,11 @@ using Steam_BackLog.Services;
 
 namespace Steam_BackLog;
 
-class Program
+internal class Program
 {
     private const string ConfigFileName = "config.json";
-    private const string CacheFileName = "cache.json";
-    private const string HtmlFileName = "SteamReport.html";
 
-    static async Task Main(string[] args)
+    private static async Task Main(string[] args)
     {
         while (true)
         {
@@ -47,21 +45,18 @@ class Program
         }
     }
 
-    static async Task ExecuteDataGatheringProcessAsync()
+    private static async Task ExecuteDataGatheringProcessAsync()
     {
         Console.Clear();
         Console.WriteLine("=== СБОР ДАННЫХ ===\n");
 
         if (!File.Exists(ConfigFileName))
-        {
-            // Создаем пустой шаблон, если файла нет
             File.WriteAllText(ConfigFileName, JsonSerializer.Serialize(new Models.Config()));
-        }
 
         var configJson = File.ReadAllText(ConfigFileName);
         var config = JsonSerializer.Deserialize<Models.Config>(configJson) ?? new Models.Config();
 
-        // Интерактивный запрос ключа
+        /* Проверка на отсутствие config.json */
         if (string.IsNullOrEmpty(config.SteamApiKey) || config.SteamApiKey == "YOUR_STEAM_API_KEY")
         {
             Console.WriteLine("Для работы программы нужен бесплатный Steam API Key.\n");
@@ -77,17 +72,21 @@ class Program
                 return;
             }
 
-            // Сохраняем введенный ключ в файл, чтобы не спрашивать в следующий раз
+            /* Сохранение ключа SteamAPI в локальный файл config.json */
             config.SteamApiKey = inputKey;
             File.WriteAllText(ConfigFileName,
                 JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
             Console.WriteLine("Ключ успешно сохранен в config.json!\n");
         }
 
+        Console.WriteLine("Необходимо указать ваш ID пользователя.\n");
+        Console.WriteLine("1. Перейдите по ссылке - https://steamid.io");
+        Console.WriteLine("2. Вставьте в поле \"input...\" ссылку на ваш профиль.");
+        Console.WriteLine("3. Скопируйте SteamID64 или SteamID (STEAM_X:Y:Z).\n");
         Console.Write("Введите ваш SteamID64 или SteamID (STEAM_X:Y:Z): ");
         var rawInput = Console.ReadLine()?.Trim();
-            
-        // Пропускаем через наш конвертер
+
+        /* Конвертор SteamID, если пользователь ввел неверные данные */
         var steamId = ParseSteamId(rawInput);
 
         if (string.IsNullOrEmpty(steamId))
@@ -96,33 +95,26 @@ class Program
             return;
         }
 
-        if (steamId != rawInput)
-        {
-            Console.WriteLine($"Распознан старый формат. Конвертировано в SteamID64: {steamId}");
-        }
+        if (steamId != rawInput) Console.WriteLine($"Распознан старый формат. Конвертировано в SteamID64: {steamId}");
 
         Console.Write("Сколько игр обработать? (Введите число или нажмите Enter для всех): ");
         var limitInput = Console.ReadLine()?.Trim();
-        int? limit = int.TryParse(limitInput, out int l) && l > 0 ? l : (int?)null;
+        var limit = int.TryParse(limitInput, out var l) && l > 0 ? l : (int?)null;
 
         Console.CursorVisible = false;
 
-        // Инициализация слоя бизнес-логики
+        /* Инициализация объекта класса SteamBacklogService на основе конфига */
         var backlogService = new SteamBacklogService(config);
 
         try
         {
-            // Запускаем сбор и передаем лямбду для обработки событий прогресса
+            /* Обработка событий и сбор данных на основе SteamAPI */
             await backlogService.ProcessAccountAsync(steamId, limit, (logMessage, currentProgress, totalItems) =>
             {
                 if (!string.IsNullOrEmpty(logMessage))
-                {
                     LogWithProgressBar(logMessage, currentProgress, totalItems);
-                }
                 else
-                {
                     DrawProgressBar(currentProgress, totalItems);
-                }
             });
 
             Console.WriteLine("\n\nСбор завершен! Данные сохранены.");
@@ -137,13 +129,13 @@ class Program
         }
     }
 
-    static void GenerateHtmlReport()
+    private static void GenerateHtmlReport()
     {
         Console.Clear();
         Console.WriteLine("=== ГЕНЕРАЦИЯ HTML ОТЧЕТА ===\n");
 
-        // Инициализация сервиса кэша (инфраструктура)
-        var cacheService = new CacheService(CacheFileName);
+        /* Инициализация кэша для работы с сохранением полученных данных */
+        var cacheService = new CacheService();
         var processedGames = cacheService.LoadCache();
 
         if (!processedGames.Any())
@@ -152,7 +144,7 @@ class Program
             return;
         }
 
-        // Инициализация слоя фильтрации (бизнес-правила)
+        /* Инициализация фильтрации данных */
         var filter = new GameFilter();
         var topGames = filter.GetTopBacklogGames(processedGames);
 
@@ -162,8 +154,8 @@ class Program
             return;
         }
 
-        // Инициализация слоя представления (генерация UI)
-        var reportGenerator = new HtmlReportGenerator(HtmlFileName);
+        /* Инициализация генерации HTML */
+        var reportGenerator = new HtmlReportGenerator();
         reportGenerator.GenerateAndOpen(topGames);
 
         Console.WriteLine("Отчет успешно сгенерирован и открыт в браузере!");
@@ -171,20 +163,19 @@ class Program
 
     // --- МЕТОДЫ ОТРИСОВКИ КОНСОЛЬНОГО UI ---
 
-    static void DrawProgressBar(int progress, int total)
+    private static void DrawProgressBar(int progress, int total)
     {
         if (total == 0) return;
 
-        double percent = (double)progress / total;
-        int width = 50;
-        int filledWidth = (int)(width * percent);
+        var percent = (double)progress / total;
+        var width = 50;
+        var filledWidth = (int)(width * percent);
 
-        // Очистка текущей строки
         Console.SetCursorPosition(0, Console.CursorTop);
         Console.Write(new string(' ', Console.WindowWidth - 1));
         Console.SetCursorPosition(0, Console.CursorTop);
 
-        string progressBar = $"[{new string('█', filledWidth)}{new string('-', width - filledWidth)}]";
+        var progressBar = $"[{new string('█', filledWidth)}{new string('-', width - filledWidth)}]";
 
         Console.ForegroundColor = ConsoleColor.Green;
         Console.Write(progressBar);
@@ -192,47 +183,40 @@ class Program
 
         Console.Write($" {Math.Round(percent * 100)}% ({progress}/{total})");
     }
-    
-    static string ParseSteamId(string input)
+
+    private static string ParseSteamId(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return null;
 
-        // Если это уже число длиной 17 символов (SteamID64)
         if (input.Length >= 15 && long.TryParse(input, out _))
-        {
             return input;
-        }
 
-        // Проверяем, является ли это форматом STEAM_X:Y:Z
+        /* Проверяем, является ли это форматом STEAM_X:Y:Z */
         var regex = new Regex(@"^STEAM_[0-5]:([01]):(\d+)$", RegexOptions.IgnoreCase);
         var match = regex.Match(input);
 
         if (match.Success)
         {
             // Формула: (Z * 2) + V + Y
-            // Где V = 76561197960265728
-            long v = 76561197960265728;
-            long y = long.Parse(match.Groups[1].Value); // Второе число (0 или 1)
-            long z = long.Parse(match.Groups[2].Value); // Третье число
+            var v = 76561197960265728;
+            var y = long.Parse(match.Groups[1].Value);
+            var z = long.Parse(match.Groups[2].Value);
 
-            long steamId64 = (z * 2) + v + y;
+            var steamId64 = z * 2 + v + y;
             return steamId64.ToString();
         }
 
-        return null; // Формат не распознан
+        return null;
     }
 
-    static void LogWithProgressBar(string message, int currentProgress, int total)
+    private static void LogWithProgressBar(string message, int currentProgress, int total)
     {
-        // Очистка строки
         Console.SetCursorPosition(0, Console.CursorTop);
         Console.Write(new string(' ', Console.WindowWidth - 1));
         Console.SetCursorPosition(0, Console.CursorTop);
 
-        // Вывод лога
         Console.WriteLine(message);
 
-        // Перерисовка бара на новой строке
         DrawProgressBar(currentProgress, total);
     }
 }

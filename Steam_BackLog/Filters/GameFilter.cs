@@ -2,7 +2,6 @@ namespace Steam_BackLog.Filters
 {
     public class GameFilter
     {
-        // Константы (бизнес-правила) вынесены наверх для удобной настройки
         private const double MaxHoursLimit = 20.0;
         private const double PlayedPercentageThreshold = 0.8;
 
@@ -21,7 +20,7 @@ namespace Steam_BackLog.Filters
                 .ToList();
         }
 
-        // --- Инкапсулированные правила (Specifications) ---
+        // --- Specifications ---
 
         // Мультиплеерные игры имеют TimeToBeatHours = 0
         private bool IsSinglePlayerGame(Models.GameData game) => 
